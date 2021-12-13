@@ -2,10 +2,12 @@
 use ggez::event::{KeyCode, KeyMods};
 use ggez::{event, graphics, Context, GameResult};
 
+mod position;
 mod solver;
 
-const GRID_SIZE: (i16, i16) = (7, 6);
-const GRID_CELL_SIZE_PX: i16 = 256;
+use crate::position::{Position, GRID_SIZE};
+
+const GRID_CELL_SIZE_PX: usize = 256;
 
 const SCREEN_SIZE: (f32, f32) = (
     GRID_SIZE.0 as f32 * GRID_CELL_SIZE_PX as f32,
@@ -14,8 +16,8 @@ const SCREEN_SIZE: (f32, f32) = (
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct GridPosition {
-    x: i16,
-    y: i16,
+    x: u8,
+    y: u8,
 }
 
 impl GridPosition {
@@ -24,8 +26,8 @@ impl GridPosition {
     // }
 
     fn point(&self) -> [f32; 2] {
-        let x = GRID_CELL_SIZE_PX as f32 / 2.0 + (self.x * GRID_CELL_SIZE_PX) as f32;
-        let y = GRID_CELL_SIZE_PX as f32 / 2.0 + ((GRID_SIZE.0 - 2 - self.y) * GRID_CELL_SIZE_PX) as f32;
+        let x = GRID_CELL_SIZE_PX as f32 / 2.0 + (self.x as usize * GRID_CELL_SIZE_PX) as f32;
+        let y = GRID_CELL_SIZE_PX as f32 / 2.0 + ((GRID_SIZE.0 - 2 - self.y) as usize * GRID_CELL_SIZE_PX) as f32;
         [x as f32, y as f32]
     }
 
@@ -34,8 +36,8 @@ impl GridPosition {
     }
 }
 
-impl From<(i16, i16)> for GridPosition {
-    fn from(pos: (i16, i16)) -> Self {
+impl From<(u8, u8)> for GridPosition {
+    fn from(pos: (u8, u8)) -> Self {
         GridPosition { x: pos.0, y: pos.1 }
     }
 }
@@ -54,6 +56,7 @@ impl Move {
             KeyCode::Down => Some(Move::Drop),
             KeyCode::NumpadEnter => Some(Move::Drop),
             KeyCode::Return => Some(Move::Drop),
+            KeyCode::Space => Some(Move::Drop),
             _ => None,
         }
     }
@@ -76,75 +79,7 @@ impl From<Palette> for graphics::Color {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Shr)]
-struct Mask {
-    value: u64
-}
-
-impl Mask {
-    pub fn position(x: u64, y: u64) -> Self {
-        Self { value: 1 << y << (x * GRID_SIZE.1 as u64) }
-    }
-
-    pub fn check_alignment(&self) -> bool {
-        let factors = [
-            1,               // vertical
-            GRID_SIZE.1,     // horizontal
-            GRID_SIZE.1 - 1, // diag 1
-            GRID_SIZE.1 + 1, // diag 2
-        ];
-
-        for factor in factors {
-            let m = self.value & (self.value >> factor);
-            if m & (m >> 2 * factor) != 0 {
-                return true
-            }
-        }
-
-        return false
-    }
-}
-
-impl From<u64> for Mask {
-    fn from(value: u64) -> Mask { Mask { value } }
-}
-
-impl From<Mask> for bool {
-    fn from(mask: Mask) -> bool { mask.value != 0 }
-}
-
-impl std::ops::BitAnd for Mask {
-    type Output = Self;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        Self { value: self.value & rhs.value }
-    }
-}
-
-impl std::ops::BitOr for Mask {
-    type Output = Self;
-
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self { value: self.value | rhs.value }
-    }
-}
-
-impl std::ops::BitXor for Mask {
-    type Output = Self;
-
-    fn bitxor(self, rhs: Self) -> Self::Output {
-        Self { value: self.value ^ rhs.value }
-    }
-}
-
-impl std::ops::Add for Mask {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self { value: self.value + rhs.value }
-    }
-}
-
+#[derive(Clone, Copy)]
 enum Who {
     PlayerRed,
     PlayerYellow
@@ -166,39 +101,32 @@ impl Who {
     }
 }
 
-struct GameState {
-    red_mask: Mask,
-    yellow_mask: Mask,
-    cursor: i16,
-    who: Who
-    // whosColor: Color,
-    // cells: LinkedList<Cell> //[[Cell; GRID_SIZE.0 as usize]; GRID_SIZE.1 as usize]
-}
-
-// struct GameState {
-//     player_mask: Mask,
-//     pieces_mask: Mask,
-//     moves: u8,
+// trait Drawable {
+//     fn draw(&mut self, ctx: &mut Context) -> GameResult<()>;
 // }
+
+// impl Drawable for Position {
+//     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+//         for char in self.moves.chars() {
+//             draw_cell
+//         }
+
+//         Ok(());
+//     }
+// }
+
+struct GameState {
+    position: Position,
+    cursor: u8,
+    who: Who
+}
 
 impl GameState {
     pub fn new(_ctx: &mut Context) -> GameState {
         GameState {
-            red_mask: 0.into(),
-            yellow_mask: 0.into(),
+            position: Position::new_empty(),
             cursor: 3,
             who: Who::PlayerRed,
-        }
-    }
-
-    fn color (&self, x: u64, y: u64) -> graphics::Color {
-        let position_mask = Mask::position(x, y);
-        if (position_mask & self.yellow_mask) == position_mask {
-            Palette::Yellow.into()
-        } else if (position_mask & self.red_mask) == position_mask {
-            Palette::Red.into()
-        } else {
-            Palette::White.into()
         }
     }
 
@@ -232,32 +160,15 @@ impl GameState {
     }
 
     pub fn try_drop(&mut self) {
-        let mut common_mask = self.red_mask | self.yellow_mask;
-        let upper_position = Mask::position(self.cursor as u64, (GRID_SIZE.1 - 1) as u64);
-
-        // Row already occupied.
-        if (common_mask & upper_position) == upper_position {
-            return
+        if self.position.next(self.cursor as u8) {
+            println!("{}", self.position);
+            if self.position.is_winning() {
+                println!("win!");
+            }
+        } else {
+            println!("could not drop");
         }
 
-        common_mask = common_mask | (common_mask + Mask::position(self.cursor as u64, 0u64));
-        let opponent_mask = match self.who {
-            Who::PlayerRed => self.yellow_mask,
-            Who::PlayerYellow => self.red_mask,
-        };
-
-        let player_mask = common_mask ^ opponent_mask;
-
-        if player_mask.check_alignment() {
-            println!("Win!")
-        }
-
-        match self.who {
-            Who::PlayerRed => self.red_mask = player_mask,
-            Who::PlayerYellow => self.yellow_mask = player_mask,
-        };
-
-        self.who = self.who.next();
     }
 }
 
@@ -270,13 +181,22 @@ impl event::EventHandler for GameState {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::Color::from_rgb(57, 105, 239));
-        for x in 0..GRID_SIZE.0  {
-            for y in 0..GRID_SIZE.1 {
-                self.draw_cell(ctx, (x, y).into(), self.color(x as u64, y as u64))?;
+        let mut counters: [u8; GRID_SIZE.0 as usize] = [0; GRID_SIZE.0 as usize];
+
+        let mut who = self.who;
+        for column in self.position.moves.clone() {
+            self.draw_cell(ctx, (column, counters[column as usize]).into(), who.color())?;
+            counters[column as usize] += 1;
+            who = who.next();
+        }
+
+        for (column, count) in counters.into_iter().enumerate() {
+            for row in count..(GRID_SIZE.1 as u8) {
+                self.draw_cell(ctx, (column as u8, row).into(), Palette::White.into())?;
             }
         }
 
-        self.draw_cursor(ctx, self.who.color())?;
+        self.draw_cursor(ctx, who.color())?;
 
         graphics::present(ctx)
     }
@@ -289,11 +209,12 @@ impl event::EventHandler for GameState {
         _repeat: bool,
     ) {
         match Move::from_keycode(keycode) {
-            Some(Move::Left) => self.cursor = (self.cursor - 1) % GRID_SIZE.0,
-            Some(Move::Right) => self.cursor = (self.cursor + 1) % GRID_SIZE.0 ,
+            Some(Move::Left) => self.cursor = (GRID_SIZE.0 + self.cursor - 1) % GRID_SIZE.0,
+            Some(Move::Right) => self.cursor = (GRID_SIZE.0 + self.cursor + 1) % GRID_SIZE.0 ,
             Some(Move::Drop) => self.try_drop(),
             None => (),
         }
+        //println!("cursor: {}", self.cursor);
     }
 }
 
