@@ -10,8 +10,8 @@ use crate::position::{Position, GRID_SIZE};
 const GRID_CELL_SIZE_PX: usize = 256;
 
 const SCREEN_SIZE: (f32, f32) = (
-    GRID_SIZE.0 as f32 * GRID_CELL_SIZE_PX as f32,
-    GRID_SIZE.1 as f32 * GRID_CELL_SIZE_PX as f32,
+    GRID_SIZE.width as f32 * GRID_CELL_SIZE_PX as f32,
+    GRID_SIZE.height as f32 * GRID_CELL_SIZE_PX as f32,
 );
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -27,7 +27,7 @@ impl GridPosition {
 
     fn point(&self) -> [f32; 2] {
         let x = GRID_CELL_SIZE_PX as f32 / 2.0 + (self.x as usize * GRID_CELL_SIZE_PX) as f32;
-        let y = GRID_CELL_SIZE_PX as f32 / 2.0 + ((GRID_SIZE.0 - 2 - self.y) as usize * GRID_CELL_SIZE_PX) as f32;
+        let y = GRID_CELL_SIZE_PX as f32 / 2.0 + ((GRID_SIZE.width - 2 - self.y) as usize * GRID_CELL_SIZE_PX) as f32;
         [x as f32, y as f32]
     }
 
@@ -122,9 +122,13 @@ struct GameState {
 }
 
 impl GameState {
-    pub fn new(_ctx: &mut Context) -> GameState {
+    pub fn new(_ctx: &mut Context, start_position: Option<String>) -> GameState {
+        println!("Starting position: {:?}", start_position);
         GameState {
-            position: Position::new_empty(),
+            position: match start_position {
+                Some(str) => Position::try_from(str).unwrap_or(Position::new_empty()),
+                None => Position::new_empty()
+            },
             cursor: 3,
             who: Who::PlayerRed,
         }
@@ -160,15 +164,12 @@ impl GameState {
     }
 
     pub fn try_drop(&mut self) {
-        if self.position.next(self.cursor as u8) {
-            println!("{}", self.position);
-            if self.position.is_winning() {
-                println!("win!");
-            }
-        } else {
-            println!("could not drop");
+        if !self.position.can_play(self.cursor as u8) { return; }
+        if self.position.is_win(self.cursor as u8) {
+            println!("win!");
         }
-
+        self.position.next(self.cursor as u8); // TODO: handle false?
+        println!("{}", self.position);
     }
 }
 
@@ -181,7 +182,7 @@ impl event::EventHandler for GameState {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::Color::from_rgb(57, 105, 239));
-        let mut counters: [u8; GRID_SIZE.0 as usize] = [0; GRID_SIZE.0 as usize];
+        let mut counters: [u8; GRID_SIZE.width as usize] = [0; GRID_SIZE.width as usize];
 
         let mut who = self.who;
         for column in self.position.moves.clone() {
@@ -191,7 +192,7 @@ impl event::EventHandler for GameState {
         }
 
         for (column, count) in counters.into_iter().enumerate() {
-            for row in count..(GRID_SIZE.1 as u8) {
+            for row in count..(GRID_SIZE.height as u8) {
                 self.draw_cell(ctx, (column as u8, row).into(), Palette::White.into())?;
             }
         }
@@ -209,8 +210,8 @@ impl event::EventHandler for GameState {
         _repeat: bool,
     ) {
         match Move::from_keycode(keycode) {
-            Some(Move::Left) => self.cursor = (GRID_SIZE.0 + self.cursor - 1) % GRID_SIZE.0,
-            Some(Move::Right) => self.cursor = (GRID_SIZE.0 + self.cursor + 1) % GRID_SIZE.0 ,
+            Some(Move::Left) => self.cursor = (GRID_SIZE.width + self.cursor - 1) % GRID_SIZE.width,
+            Some(Move::Right) => self.cursor = (GRID_SIZE.width + self.cursor + 1) % GRID_SIZE.width ,
             Some(Move::Drop) => self.try_drop(),
             None => (),
         }
@@ -230,7 +231,7 @@ fn main() {
     // Create an instance of your event handler.
     // Usually, you should provide it with the Context object to
     // use when setting your game up.
-    let state = GameState::new(&mut ctx);
+    let state = GameState::new(&mut ctx, std::env::args().nth(1));
 
     // Run!
     event::run(ctx, event_loop, state);
