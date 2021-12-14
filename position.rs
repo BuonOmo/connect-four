@@ -52,7 +52,7 @@ impl Position {
 		let factors = [
             1,                    // vertical
             GRID_SIZE.height + 1, // horizontal
-            GRID_SIZE.height - 1, // diag 1
+            GRID_SIZE.height + 2, // diag 1
             GRID_SIZE.height,     // diag 2
         ];
 
@@ -273,11 +273,11 @@ struct Mask(u64);
 
 impl std::fmt::Display for Mask {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let s: Vec<char> = format!("{:#044b}", self.0).chars().rev().collect();
+		let s: Vec<char> = format!("{:#051b}", self.0).chars().rev().collect();
 
-		for row in (0..GRID_SIZE.width).rev() {
-			writeln!(f, "{}", (0..GRID_SIZE.height).map(
-				|i| s[(row + i * (GRID_SIZE.width)) as usize]
+		for row in (0..(GRID_SIZE.height + 1)).rev() {
+			writeln!(f, "{}", (0..GRID_SIZE.width).map(
+				|i| s[(row + i * (GRID_SIZE.height + 1)) as usize]
 			).fold(String::new(), |a, b| a + &b.to_string()))?;
 		}
 		return Ok(());
