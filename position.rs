@@ -22,19 +22,9 @@ impl Position {
 	}
 
 	pub fn is_win(&self, col: u8) -> bool {
-		// let mut mask = self.player_mask;
-		// println!("mov={}\nold_pos\n{}\n", col, Mask::from(mask));
-		// mask ^= self.pieces_mask;
-		// // println!("opponent\n{}\n", Mask::from(mask));
-		// mask ^= self.pieces_mask | (self.pieces_mask + (1 << (col * GRID_SIZE.height)));
-
-		// println!("new_pos\n{}", Mask::from(mask));
-
-		// println!("new_pos aligned? {}\n", Position::check_alignment(mask));
-		// return Position::check_alignment(mask);
 		let mut mask =  self.player_mask;
         mask |= (self.pieces_mask + Position::bottom_mask(col)) & Position::column_mask(col);
-		println!("old\n{}\nnew\n{}\n", Mask::from(self.player_mask), Mask::from(mask));
+		println!("old\n{}\nnew\n{}\n", Mask(self.player_mask), Mask(mask));
 		println!("new_pos aligned? {}", Position::check_alignment(mask));
 		return Position::check_alignment(mask);
 	}
@@ -80,8 +70,8 @@ impl Position {
 	pub fn can_play(&self, column: u8) -> bool {
 		let column_mask = 1 << (GRID_SIZE.height - 1) << (column * (GRID_SIZE.height + 1));
 
-		// println!("col\n{}", Mask::from(column_mask));
-		// println!("pieces\n{}", Mask::from(self.pieces_mask));
+		// println!("col\n{}", Mask(column_mask));
+		// println!("pieces\n{}", Mask(self.pieces_mask));
 
 		return (self.pieces_mask & column_mask) == 0;
 	}
@@ -238,8 +228,8 @@ mod tests_try_from_string {
 	#[test]
 	fn str_22() {
 		assert_eq!(Position::try_from("22".to_string()), Ok(Position {
-			player_mask: 1 << 6,
-			pieces_mask: (1|2) << 6,
+			player_mask: 1 << (GRID_SIZE.height + 1),
+			pieces_mask: (1|2) << (GRID_SIZE.height + 1),
 			move_count: 2,
 			moves: LinkedList::from([1, 1])
 		}));
@@ -302,15 +292,13 @@ impl From<&str> for Mask {
 		assert_eq!(bidym_chars.len(), GRID_SIZE.width as usize);
 		assert_eq!(bidym_chars[0].len(), (GRID_SIZE.height + 1) as usize);
 
-		// let mut list = std::collections::LinkedList::new();
 		let mut rv = 0u64;
 		let mut pow = 0;
 
 		for i in 0..GRID_SIZE.width {
-			for j in 0..GRID_SIZE.height {
-				rv |= bidym_chars[(GRID_SIZE.height - j - 1) as usize][i as usize] << pow;
+			for j in 0..(GRID_SIZE.height + 1) {
+				rv |= bidym_chars[(GRID_SIZE.height - j) as usize][i as usize] << pow;
 				pow += 1;
-				// list.push_back(bidym_chars[(GRID_SIZE.1 - j - 1) as usize][i as usize]);
 			}
 		}
 
@@ -328,8 +316,9 @@ impl From<&str> for Mask {
 
 #[test]
 fn test_mask_from_str() {
+	println!("{}", Mask((1 | 2 | 4) << (GRID_SIZE.height + 1)));
 	assert_eq!(
-		Mask((1 | 2 | 4) << 6),
+		Mask((1 | 2 | 4) << (GRID_SIZE.height + 1)),
 		Mask::from("
 			0000000
 			0000000
@@ -351,6 +340,7 @@ fn test_mask_from_str() {
 			1100100
 		").to_string(),
 		"\
+			0000000\n\
 			1100001\n\
 		 	0100000\n\
 			0011001\n\
@@ -367,9 +357,9 @@ impl std::fmt::Display for Position {
 		writeln!(f, "moves({:0>2}): {}\n", self.move_count, self.short_str())?;
 
 		writeln!(f, "pieces_mask")?;
-		writeln!(f, "{}", Mask::from(self.pieces_mask))?;
+		writeln!(f, "{}", Mask(self.pieces_mask))?;
 		writeln!(f, "player_mask")?;
-		writeln!(f, "{}", Mask::from(self.player_mask))?;
+		writeln!(f, "{}", Mask(self.player_mask))?;
 
 		Ok(())
 	}
@@ -378,8 +368,8 @@ impl std::fmt::Display for Position {
 #[test]
 fn test_display_position() {
 	assert_eq!(format!("{}", Position {
-		player_mask: 2 << 6,
-		pieces_mask: 7 << 6,
+		player_mask: 2 << (GRID_SIZE.height + 1),
+		pieces_mask: 7 << (GRID_SIZE.height + 1),
 		move_count: 3,
 		moves: LinkedList::from([1, 1, 1])
 	}),
@@ -389,11 +379,13 @@ pieces_mask
 0000000
 0000000
 0000000
+0000000
 0100000
 0100000
 0100000
 
 player_mask
+0000000
 0000000
 0000000
 0000000
