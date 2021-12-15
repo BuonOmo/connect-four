@@ -32,14 +32,22 @@ impl Solver {
 
 	fn new() -> Solver { Solver { positions_checked: 0 } }
 
-	fn strongly_solve(&mut self, position: String) -> Result<Outcome, &'static str> {
+	fn weakly_solve(&mut self, position: String) -> Result<Outcome, &'static str> {
 		match Position::try_from(position) {
-			Result::Ok(pos) => Ok(self.negamax(pos).into()),
+			Result::Ok(pos) => Ok(self.negamax(pos, -1,  1).into()),
 			Result::Err(err) => Err(err)
 		}
 	}
 
-	fn negamax(&mut self, pos: Position) -> i8 {
+
+	fn strongly_solve(&mut self, position: String) -> Result<Outcome, &'static str> {
+		match Position::try_from(position) {
+			Result::Ok(pos) => Ok(self.negamax(pos, i8::MIN + 1, i8::MAX - 1).into()),
+			Result::Err(err) => Err(err)
+		}
+	}
+
+	fn negamax(&mut self, pos: Position, mut alpha: i8, mut beta: i8) -> i8 {
 		self.positions_checked += 1;
 		// Check for draw, this is ok to do it here, but if given an
 		// already winning position with a full grid, negamax would
@@ -55,13 +63,20 @@ impl Solver {
 
 		if pos.can_win() { return position_evaluation; }
 
-		let	mut max_score = i8::MIN;
-
-		for mov in pos.possible_moves() {
-			max_score = std::cmp::max(max_score, -self.negamax(pos.next(mov)));
+		if beta > position_evaluation {
+			beta = position_evaluation;       // max possible score anyway.
+			if alpha >= beta { return beta; } // we can prun early, the window is empty.
 		}
 
-		return max_score;
+		for mov in pos.possible_moves() {
+			// Prune the window by checking the score of the opponent.
+			// Since opponent win condition is the opposite of ours, their
+			// window is [-beta;-alpha].
+			alpha = std::cmp::max(alpha, -self.negamax(pos.next(mov), -beta, -alpha));
+			if alpha >= beta { break; }
+		}
+
+		return alpha;
 	}
 }
 
