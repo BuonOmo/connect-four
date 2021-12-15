@@ -30,9 +30,17 @@ impl Solver {
 		}
 	}
 
+	pub fn weakly_solve(position: String) -> Result<(u128, Outcome), &'static str> {
+		let mut solver = Solver::new();
+		match solver._weakly_solve(position) {
+			Result::Ok(outcome) => Ok((solver.positions_checked, outcome)),
+			Result::Err(err) => Err(err)
+		}
+	}
+
 	fn new() -> Solver { Solver { positions_checked: 0 } }
 
-	fn weakly_solve(&mut self, position: String) -> Result<Outcome, &'static str> {
+	fn _weakly_solve(&mut self, position: String) -> Result<Outcome, &'static str> {
 		match Position::try_from(position) {
 			Result::Ok(pos) => Ok(self.negamax(pos, -1,  1).into()),
 			Result::Err(err) => Err(err)
