@@ -17,90 +17,55 @@ impl From<i8> for Outcome {
 	}
 }
 
-
-
-pub fn solve(position: String) -> Result<Outcome, &'static str> {
-	// let maybe_position: Result<Position, &'static str> = position;
-	match Position::try_from(position) {
-		Result::Ok(pos) => Ok(negamax(pos).into()),
-		Result::Err(err) => Err(err)
-	}
+pub struct Solver {
+	positions_checked: u128
 }
 
-fn negamax(pos: Position) -> i8 {
-	if pos.can_win() {
-		return (
+impl Solver {
+	pub fn solve(position: String) -> Result<(u128, Outcome), &'static str> {
+		let mut solver = Solver::new();
+		match solver.strongly_solve(position) {
+			Result::Ok(outcome) => Ok((solver.positions_checked, outcome)),
+			Result::Err(err) => Err(err)
+		}
+	}
+
+	fn new() -> Solver { Solver { positions_checked: 0 } }
+
+	fn strongly_solve(&mut self, position: String) -> Result<Outcome, &'static str> {
+		match Position::try_from(position) {
+			Result::Ok(pos) => Ok(self.negamax(pos).into()),
+			Result::Err(err) => Err(err)
+		}
+	}
+
+	fn negamax(&mut self, pos: Position) -> i8 {
+		self.positions_checked += 1;
+		// Check for draw, this is ok to do it here, but if given an
+		// already winning position with a full grid, negamax would
+		// still consider it a draw.
+		if pos.is_terminal() { return 0; }
+
+		// upper bound of the score (if winning, then this is the actual score).
+		let position_evaluation = (
 			position::GRID_SIZE.width as i8 * position::GRID_SIZE.height as i8
 			+ 1
 			- pos.move_count as i8
 		) / 2;
+
+		if pos.can_win() { return position_evaluation; }
+
+		let	mut max_score = i8::MIN;
+
+		for mov in pos.possible_moves() {
+			max_score = std::cmp::max(max_score, -self.negamax(pos.next(mov)));
+		}
+
+		return max_score;
 	}
-	if pos.is_terminal() { return 0; }
-
-	let mut max_score = i8::MIN;
-
-	for mov in pos.possible_moves() {
-		let score = -negamax(pos.next(mov));
-		if score > max_score { max_score = score };
-	}
-
-	return max_score;
 }
 
 #[test]
 fn test_solve() {
-	assert_eq!(solve("23163416124767223154467471272416755633".to_string()), Ok(Outcome::Draw))
+	assert!(matches!(Solver::solve("23163416124767223154467471272416755633".to_string()), Ok((_, Outcome::Draw))))
 }
-
-#[cfg(test)]
-mod global_tests {
-	use super::*;
-	use std::fs::File;
-	use std::io::{self, BufRead};
-	use std::path::Path;
-
-	fn test_file(filename: String) {
-		fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-		where P: AsRef<Path>, {
-			let file = File::open(filename)?;
-			Ok(io::BufReader::new(file).lines())
-		}
-		for line in read_lines(filename).unwrap() {
-			let line_str = line.unwrap();
-			let mut split = line_str.split(' ');
-			let pos_str = split.next().unwrap();
-			let outcome_int: i8 = split.next().unwrap().parse().unwrap();
-			assert_eq!(solve(pos_str.to_string()), Ok(Outcome::from(outcome_int)));
-		}
-	}
-
-	#[test]
-	fn test_solve_end_easy() {
-		test_file(format!("{}/data/Test_L3_R1", env!("CARGO_MANIFEST_DIR")))
-	}
-
-	#[test]
-	#[ignore = "too slow yet"]
-	fn test_solve_middle_easy() {
-		test_file(format!("{}/data/Test_L2_R1", env!("CARGO_MANIFEST_DIR")))
-	}
-}
-
-// #![feature(test)]
-
-// extern crate test;
-
-// #[cfg(test)]
-// mod tests {
-
-// 	use test::Bencher;
-
-// 	#[bench]
-// 	fn bench_xor_1000_ints(b: &mut Bencher) {
-// 		b.iter(|| {
-// 			// Use `test::black_box` to prevent compiler optimizations from disregarding
-// 			// Unused values
-// 			test::black_box((0..1000).fold(0, |old, new| old ^ new));
-// 		});
-// 	}
-// }

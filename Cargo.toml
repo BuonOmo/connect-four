@@ -3,6 +3,7 @@ name = "connect-four"
 version = "0.1.0"
 authors = ["Ulysse Buonomo <buonomo.ulysse@gmail.com>"]
 edition = "2021"
+default-run = "connect-four"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -15,3 +16,7 @@ mint = "0.5.8"
 [[bin]]
 name = "connect-four"
 path = "main.rs"
+
+[[bin]]
+name = "benchmark"
+path = "benchmark.rs"
