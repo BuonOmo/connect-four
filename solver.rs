@@ -76,7 +76,11 @@ impl Solver {
 			if alpha >= beta { return beta; } // we can prun early, the window is empty.
 		}
 
-		for mov in pos.possible_moves() {
+		// Moves in the center are more likely to provide an efficient result, this
+		// heuristic should massively improve our alpha-beta pruning.
+		for mov in [3, 4, 2, 5, 1, 6, 0] {
+			if !pos.can_play(mov) { continue }
+
 			// Prune the window by checking the score of the opponent.
 			// Since opponent win condition is the opposite of ours, their
 			// window is [-beta;-alpha].

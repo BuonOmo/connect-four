@@ -16,11 +16,13 @@ fn main() {
 			"begin_medium",
 			"begin_hard",
 		] {
-			test_file(
-				test,
-				format!("{}/data/{}", env!("CARGO_MANIFEST_DIR"), test),
-				strongly,
-			);
+			if let Err(_) =
+				test_file(
+					test,
+					format!("{}/data/{}", env!("CARGO_MANIFEST_DIR"), test),
+					strongly,
+				)
+			{ break }
 		}
 	}
 
@@ -28,7 +30,7 @@ fn main() {
 
 
 
-fn test_file(title: &str, filename: String, strongly: bool) {
+fn test_file(title: &str, filename: String, strongly: bool) -> Result<(), String> {
 	let start = std::time::Instant::now();
 	fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 	where P: AsRef<Path>, {
@@ -40,7 +42,7 @@ fn test_file(title: &str, filename: String, strongly: bool) {
 	let mut count = 0u128;
 
 	for line in read_lines(filename).unwrap() {
-		if start.elapsed().as_secs() > 60 { break }
+		if start.elapsed().as_secs() > 1_200 { return Err("Could not finish in time.".to_string()) }
 
 		let line_str = line.unwrap();
 		let mut split = line_str.split(' ');
@@ -56,9 +58,23 @@ fn test_file(title: &str, filename: String, strongly: bool) {
 		let duration = now.elapsed().as_nanos();
 
 		if strongly {
-			assert_eq!(actual_outcome, expected_outcome);
+			if actual_outcome != expected_outcome {
+				return Err(format!(
+					"failed({}): expected {:?}, got {:?}",
+					line_str.trim(),
+					actual_outcome,
+					expected_outcome
+				))
+			}
 		} else {
-			assert_eq!(std::mem::discriminant(&actual_outcome), std::mem::discriminant(&expected_outcome));
+			if std::mem::discriminant(&actual_outcome) != std::mem::discriminant(&expected_outcome) {
+				return Err(format!(
+					"failed({}): expected {:?}, got {:?} (weak solver)",
+					line_str.trim(),
+					actual_outcome,
+					expected_outcome
+				))
+			}
 		}
 
 		sum_durations += duration;
@@ -82,5 +98,6 @@ fn test_file(title: &str, filename: String, strongly: bool) {
 		sum_positions_checked as f64 / count as f64,
 		strongly,
 		count as f64 / 10.0,
-	)
+	);
+	Ok(())
 }
