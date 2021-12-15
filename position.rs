@@ -8,7 +8,7 @@ pub const GRID_SIZE: GridSize = GridSize { height: 6, width: 7 };
 pub struct Position {
 	player_mask: u64,
 	pieces_mask: u64,
-	move_count: u8,
+	pub move_count: u8,
 	pub moves: LinkedList<u8>
 }
 
@@ -21,21 +21,14 @@ impl Position {
 		self.moves.iter().fold(String::new(), |a, b| a + &(b+1).to_string())
 	}
 
-	pub fn is_win(&self, col: u8) -> bool {
+	pub fn wins(&self, col: u8) -> bool {
 		let mut mask =  self.player_mask;
         mask |= (self.pieces_mask + Position::bottom_mask(col)) & Position::column_mask(col);
-		println!("old\n{}\nnew\n{}\n", Mask(self.player_mask), Mask(mask));
-		println!("new_pos aligned? {}", Position::check_alignment(mask));
 		return Position::check_alignment(mask);
 	}
 
-    pub fn will_win(&self) -> bool {
-		for mov in self.possible_moves() {
-			if self.is_win(mov) { return true; }
-		}
-
-
-		return false
+    pub fn can_win(&self) -> bool {
+		self.possible_moves().any(|mov|self.wins(mov))
     }
 
 	fn check_alignment(mask: u64) -> bool {
@@ -45,13 +38,6 @@ impl Position {
             GRID_SIZE.height + 2, // diag 1
             GRID_SIZE.height,     // diag 2
         ];
-
-		let dbg = std::collections::HashMap::from([
-            (1,                    "vertical"),
-            (GRID_SIZE.height + 1, "horizontal"),
-            (GRID_SIZE.height - 1, "diag 1"),
-            (GRID_SIZE.height,     "diag 2"),
-        ]);
 
         for factor in factors {
             let m = mask & (mask >> factor);
@@ -68,12 +54,7 @@ impl Position {
 	}
 
 	pub fn can_play(&self, column: u8) -> bool {
-		let column_mask = 1 << (GRID_SIZE.height - 1) << (column * (GRID_SIZE.height + 1));
-
-		// println!("col\n{}", Mask(column_mask));
-		// println!("pieces\n{}", Mask(self.pieces_mask));
-
-		return (self.pieces_mask & column_mask) == 0;
+		return (self.pieces_mask & Position::top_mask(column)) == 0;
 	}
 
 	pub fn possible_moves(&self) -> impl Iterator<Item=u8> + '_ {
@@ -104,7 +85,7 @@ impl Position {
 
 	// return a bitmask containg a single 1 corresponding to the top cel of a given column
 	pub fn top_mask(col: u8) -> u64 {
-		return (1 << (GRID_SIZE.height - 1)) << (col*(GRID_SIZE.height+1));
+		return 1 << (GRID_SIZE.height - 1) << (col * (GRID_SIZE.height+1));
 	}
 
 	// return a bitmask containg a single 1 corresponding to the bottom cell of a given column
@@ -142,28 +123,27 @@ mod tests {
 	}
 
 	#[test]
-	fn is_win() {
+	fn wins() {
 		assert!(
-			Position::try_from("343434").unwrap().is_win(2),
+			Position::try_from("343434").unwrap().wins(2),
 			"Vertical"
 		);
 		assert!(
-			Position::try_from("112233").unwrap().is_win(3),
+			Position::try_from("112233").unwrap().wins(3),
 			"Horizontal"
 		);
 		assert!(
-			Position::try_from("1224333447").unwrap().is_win(3),
+			Position::try_from("1224333447").unwrap().wins(3),
 			"Diagonal"
 		);
 		assert!(
-			Position::try_from("444466575").unwrap().is_win(4),
+			Position::try_from("444466575").unwrap().wins(4),
 			"Rev diagonal"
 		);
 	}
 
 	#[test]
 	fn check_alignment() {
-		println!("Check alignment {:?}", std::env::args().nth(2));
 		assert!(
 			!Position::check_alignment(Mask::from("
 				0000000
@@ -316,7 +296,6 @@ impl From<&str> for Mask {
 
 #[test]
 fn test_mask_from_str() {
-	println!("{}", Mask((1 | 2 | 4) << (GRID_SIZE.height + 1)));
 	assert_eq!(
 		Mask((1 | 2 | 4) << (GRID_SIZE.height + 1)),
 		Mask::from("

@@ -1,4 +1,5 @@
 use crate::position::Position;
+use crate::position;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Outcome {
@@ -21,32 +22,25 @@ impl From<i8> for Outcome {
 pub fn solve(position: String) -> Result<Outcome, &'static str> {
 	// let maybe_position: Result<Position, &'static str> = position;
 	match Position::try_from(position) {
-		Result::Ok(pos) => Ok(solve_(pos)),
+		Result::Ok(pos) => Ok(negamax(pos).into()),
 		Result::Err(err) => Err(err)
 	}
 }
 
-fn solve_(position: Position) -> Outcome {
-	negamax(position).into()
-}
-
-// function negamax(node, depth, color) is
-//     if depth = 0 or node is a terminal node then
-//         return color × the heuristic value of node
-//     value := −∞
-//     for each child of node do
-//         value := max(value, −negamax(child, depth − 1, −color))
-//     return value
-
-fn negamax(position: Position) -> i8 {
-	println!("negamax({})", position.short_str());
-	if position.will_win() { return 1; }
-	if position.is_terminal() { return 0; }
+fn negamax(pos: Position) -> i8 {
+	if pos.can_win() {
+		return (
+			position::GRID_SIZE.width as i8 * position::GRID_SIZE.height as i8
+			+ 1
+			- pos.move_count as i8
+		) / 2;
+	}
+	if pos.is_terminal() { return 0; }
 
 	let mut max_score = i8::MIN;
 
-	for mov in position.possible_moves() {
-		let mut p2 = position.clone();
+	for mov in pos.possible_moves() {
+		let mut p2 = pos.clone();
 		p2.next(mov);
 
 		let score = -negamax(p2);
@@ -57,8 +51,33 @@ fn negamax(position: Position) -> i8 {
 }
 
 #[test]
-pub fn test_solve() {
+fn test_solve() {
 	assert_eq!(solve("23163416124767223154467471272416755633".to_string()), Ok(Outcome::Draw))
+}
+
+#[cfg(test)]
+mod global_tests {
+	use super::*;
+	use std::fs::File;
+	use std::io::{self, BufRead};
+	use std::path::Path;
+
+	fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+	where P: AsRef<Path>, {
+		let file = File::open(filename)?;
+		Ok(io::BufReader::new(file).lines())
+	}
+
+	#[test]
+	fn test_solve_end_easy() {
+		for line in read_lines(format!("{}/data/Test_L3_R1", env!("CARGO_MANIFEST_DIR"))).unwrap() {
+			let line_str = line.unwrap();
+			let mut split = line_str.split(' ');
+			let pos_str = split.next().unwrap();
+			let outcome_int: i8 = split.next().unwrap().parse().unwrap();
+			assert_eq!(solve(pos_str.to_string()), Ok(Outcome::from(outcome_int)));
+		}
+	}
 }
 
 // #![feature(test)]

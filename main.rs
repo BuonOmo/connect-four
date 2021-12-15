@@ -165,7 +165,7 @@ impl GameState {
 
     pub fn try_drop(&mut self) {
         if !self.position.can_play(self.cursor as u8) { return; }
-        if self.position.is_win(self.cursor as u8) {
+        if self.position.wins(self.cursor as u8) {
             println!("win!");
         }
         self.position.next(self.cursor as u8); // TODO: handle false?
