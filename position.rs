@@ -1,5 +1,3 @@
-use std::collections::LinkedList;
-
 pub struct GridSize { pub height: u8, pub width: u8 }
 
 pub const GRID_SIZE: GridSize = GridSize { height: 6, width: 7 };
@@ -9,16 +7,11 @@ pub struct Position {
 	player_mask: u64,
 	pieces_mask: u64,
 	pub move_count: u8,
-	pub moves: LinkedList<u8>
 }
 
 impl Position {
 	pub fn new_empty() -> Position {
-		Position { player_mask: 0, pieces_mask: 0, move_count: 0, moves: LinkedList::new() }
-	}
-
-	pub fn short_str(&self) -> String {
-		self.moves.iter().fold(String::new(), |a, b| a + &(b+1).to_string())
+		Position { player_mask: 0, pieces_mask: 0, move_count: 0 }
 	}
 
 	pub fn wins(&self, col: u8) -> bool {
@@ -61,26 +54,13 @@ impl Position {
 		return (0..GRID_SIZE.width).filter(|x| self.can_play(*x));
 	}
 
-	pub fn next(&mut self, column: u8) -> bool {
-		if !self.can_play(column) { return false; }
-
-		self.player_mask ^= self.pieces_mask;
-		self.pieces_mask |= self.pieces_mask + (1 << (column * (GRID_SIZE.height + 1)));
-		self.moves.push_back(column);
-		self.move_count += 1;
-		return true;
-		// Immutable?
-		// let pieces_mask = self.pieces_mask | (self.pieces_mask + 1 << column * GRID_SIZE.1);
-		// let mut moves = self.moves.clone();
-		// moves.push_back(column);
-		// Some(
-		// 	Position {
-		// 		player_mask: self.pieces_mask ^ self.player_mask,
-		// 		pieces_mask: pieces_mask,
-		// 		move_count: self.move_count + 1,
-		// 		moves: moves,
-		// 	}
-		// )
+	// Must be called on a playable move, see `can_play`.
+	pub fn next(&self, column: u8) -> Position {
+		Position {
+			player_mask: self.player_mask ^ self.pieces_mask,
+			pieces_mask: self.pieces_mask | (self.pieces_mask + Position::bottom_mask(column)),
+			move_count: self.move_count + 1
+		}
 	}
 
 	// return a bitmask containg a single 1 corresponding to the top cel of a given column
@@ -167,7 +147,9 @@ impl TryFrom<String> for Position {
 
 		let mut pos = Position::new_empty();
 		for mov in s.chars().map(|c|c.to_digit(10).unwrap()-1) {
-			if !pos.next(mov as u8) { return Err("Position contains an invalid move.") }
+			if !pos.can_play(mov as u8) { return Err("Position contains an invalid move.") }
+
+			pos = pos.next(mov as u8);
 		}
 		return Ok(pos);
 	}
@@ -191,7 +173,6 @@ mod tests_try_from_string {
 			player_mask: 0,
 			pieces_mask: 1,
 			move_count: 1,
-			moves: LinkedList::from([0])
 		}));
 	}
 
@@ -201,7 +182,6 @@ mod tests_try_from_string {
 			player_mask: 2,
 			pieces_mask: 7,
 			move_count: 3,
-			moves: LinkedList::from([0, 0, 0])
 		}));
 	}
 
@@ -210,8 +190,7 @@ mod tests_try_from_string {
 		assert_eq!(Position::try_from("22".to_string()), Ok(Position {
 			player_mask: 1 << (GRID_SIZE.height + 1),
 			pieces_mask: (1|2) << (GRID_SIZE.height + 1),
-			move_count: 2,
-			moves: LinkedList::from([1, 1])
+			move_count: 2
 		}));
 	}
 
@@ -282,15 +261,7 @@ impl From<&str> for Mask {
 			}
 		}
 
-		// let mut pow = -1;
-
-		Mask(
-			rv
-			// list.iter().fold(0, |a, b| {
-			// 	pow += 1;
-			// 	a | (b << pow)
-			// })
-		)
+		Mask(rv)
 	}
 }
 
@@ -333,7 +304,7 @@ fn test_mask_from_str() {
 
 impl std::fmt::Display for Position {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		writeln!(f, "moves({:0>2}): {}\n", self.move_count, self.short_str())?;
+		writeln!(f, "move_count: {:0>2}\n", self.move_count)?;
 
 		writeln!(f, "pieces_mask")?;
 		writeln!(f, "{}", Mask(self.pieces_mask))?;
@@ -349,10 +320,9 @@ fn test_display_position() {
 	assert_eq!(format!("{}", Position {
 		player_mask: 2 << (GRID_SIZE.height + 1),
 		pieces_mask: 7 << (GRID_SIZE.height + 1),
-		move_count: 3,
-		moves: LinkedList::from([1, 1, 1])
+		move_count: 3
 	}),
-"moves(03): 222
+"move_count: 03
 
 pieces_mask
 0000000

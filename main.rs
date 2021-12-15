@@ -1,4 +1,4 @@
-// use std::collections::LinkedList;
+use std::collections::LinkedList;
 use ggez::event::{KeyCode, KeyMods};
 use ggez::{event, graphics, Context, GameResult};
 
@@ -118,7 +118,8 @@ impl Who {
 struct GameState {
     position: Position,
     cursor: u8,
-    who: Who
+    who: Who,
+    moves: LinkedList<u8>,
 }
 
 impl GameState {
@@ -131,6 +132,7 @@ impl GameState {
             },
             cursor: 3,
             who: Who::PlayerRed,
+            moves: LinkedList::new(),
         }
     }
 
@@ -168,7 +170,8 @@ impl GameState {
         if self.position.wins(self.cursor as u8) {
             println!("win!");
         }
-        self.position.next(self.cursor as u8); // TODO: handle false?
+        self.moves.push_back(self.cursor);
+        self.position = self.position.next(self.cursor as u8);
         println!("{}", self.position);
     }
 }
@@ -185,7 +188,7 @@ impl event::EventHandler for GameState {
         let mut counters: [u8; GRID_SIZE.width as usize] = [0; GRID_SIZE.width as usize];
 
         let mut who = self.who;
-        for column in self.position.moves.clone() {
+        for column in self.moves.clone() {
             self.draw_cell(ctx, (column, counters[column as usize]).into(), who.color())?;
             counters[column as usize] += 1;
             who = who.next();

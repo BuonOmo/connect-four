@@ -40,10 +40,7 @@ fn negamax(pos: Position) -> i8 {
 	let mut max_score = i8::MIN;
 
 	for mov in pos.possible_moves() {
-		let mut p2 = pos.clone();
-		p2.next(mov);
-
-		let score = -negamax(p2);
+		let score = -negamax(pos.next(mov));
 		if score > max_score { max_score = score };
 	}
 
@@ -62,21 +59,30 @@ mod global_tests {
 	use std::io::{self, BufRead};
 	use std::path::Path;
 
-	fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-	where P: AsRef<Path>, {
-		let file = File::open(filename)?;
-		Ok(io::BufReader::new(file).lines())
-	}
-
-	#[test]
-	fn test_solve_end_easy() {
-		for line in read_lines(format!("{}/data/Test_L3_R1", env!("CARGO_MANIFEST_DIR"))).unwrap() {
+	fn test_file(filename: String) {
+		fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+		where P: AsRef<Path>, {
+			let file = File::open(filename)?;
+			Ok(io::BufReader::new(file).lines())
+		}
+		for line in read_lines(filename).unwrap() {
 			let line_str = line.unwrap();
 			let mut split = line_str.split(' ');
 			let pos_str = split.next().unwrap();
 			let outcome_int: i8 = split.next().unwrap().parse().unwrap();
 			assert_eq!(solve(pos_str.to_string()), Ok(Outcome::from(outcome_int)));
 		}
+	}
+
+	#[test]
+	fn test_solve_end_easy() {
+		test_file(format!("{}/data/Test_L3_R1", env!("CARGO_MANIFEST_DIR")))
+	}
+
+	#[test]
+	#[ignore = "too slow yet"]
+	fn test_solve_middle_easy() {
+		test_file(format!("{}/data/Test_L2_R1", env!("CARGO_MANIFEST_DIR")))
 	}
 }
 
