@@ -2,6 +2,9 @@ pub struct GridSize { pub height: u8, pub width: u8 }
 
 pub const GRID_SIZE: GridSize = GridSize { height: 6, width: 7 };
 
+pub const MIN_SCORE: i8 = -((GRID_SIZE.width*GRID_SIZE.height) as i8)/2 + 3;
+pub const MAX_SCORE: i8 = (GRID_SIZE.width*GRID_SIZE.height+1) as i8/2 - 3;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Position {
 	player_mask: u64,
@@ -24,24 +27,6 @@ impl Position {
 		self.possible_moves().any(|mov|self.wins(mov))
     }
 
-	fn check_alignment(mask: u64) -> bool {
-		let factors = [
-            1,                    // vertical
-            GRID_SIZE.height + 1, // horizontal
-            GRID_SIZE.height + 2, // diag 1
-            GRID_SIZE.height,     // diag 2
-        ];
-
-        for factor in factors {
-            let m = mask & (mask >> factor);
-            if (m & (m >> (2 * factor))) != 0 {
-                return true;
-            }
-        }
-
-        return false;
-	}
-
 	pub fn is_terminal(&self) -> bool {
 		return self.move_count == GRID_SIZE.width * GRID_SIZE.height;
 	}
@@ -63,18 +48,40 @@ impl Position {
 		}
 	}
 
+	pub fn key(&self) -> u64 {
+		self.player_mask + self.pieces_mask
+	}
+
+	fn check_alignment(mask: u64) -> bool {
+		let factors = [
+            1,                    // vertical
+            GRID_SIZE.height + 1, // horizontal
+            GRID_SIZE.height + 2, // diag 1
+            GRID_SIZE.height,     // diag 2
+        ];
+
+        for factor in factors {
+            let m = mask & (mask >> factor);
+            if (m & (m >> (2 * factor))) != 0 {
+                return true;
+            }
+        }
+
+        return false;
+	}
+
 	// return a bitmask containg a single 1 corresponding to the top cel of a given column
-	pub fn top_mask(col: u8) -> u64 {
+	fn top_mask(col: u8) -> u64 {
 		return 1 << (GRID_SIZE.height - 1) << (col * (GRID_SIZE.height+1));
 	}
 
 	// return a bitmask containg a single 1 corresponding to the bottom cell of a given column
-	pub fn bottom_mask(col: u8) -> u64 {
+	fn bottom_mask(col: u8) -> u64 {
 		return 1 << (col*(GRID_SIZE.height+1));
 	}
 
 	// return a bitmask 1 on all the cells of a given column
-	pub fn column_mask(col: u8) -> u64 {
+	fn column_mask(col: u8) -> u64 {
 		return ((1 << GRID_SIZE.height)-1) << col*(GRID_SIZE.height+1);
 	}
 }

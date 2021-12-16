@@ -7,22 +7,25 @@ mod solver;
 use crate::solver::{Outcome, Solver};
 
 fn main() {
-	for strongly in [false, true] {
-		for test in [
-			"end_easy",
-			"middle_easy",
-			"middle_medium",
-			"begin_easy",
-			"begin_medium",
-			"begin_hard",
-		] {
-			if let Err(_) =
+	for test in [
+		"end_easy",
+		"middle_easy",
+		"middle_medium",
+		"begin_easy",
+		"begin_medium",
+		"begin_hard",
+	] {
+		for strongly in [false, true] {
+			if let Err(err) =
 				test_file(
 					test,
 					format!("{}/data/{}", env!("CARGO_MANIFEST_DIR"), test),
 					strongly,
 				)
-			{ break }
+			{
+				println!("{}", err);
+				break
+			}
 		}
 	}
 
@@ -39,10 +42,10 @@ fn test_file(title: &str, filename: String, strongly: bool) -> Result<(), String
 	}
 	let mut sum_durations = 0u128;
 	let mut sum_positions_checked = 0u128;
-	let mut count = 0u128;
+	let mut count = 0u16;
 
 	for line in read_lines(filename).unwrap() {
-		if start.elapsed().as_secs() > 1_200 { return Err("Could not finish in time.".to_string()) }
+		if start.elapsed().as_secs() > 1_200 { break }
 
 		let line_str = line.unwrap();
 		let mut split = line_str.split(' ');
@@ -60,7 +63,10 @@ fn test_file(title: &str, filename: String, strongly: bool) -> Result<(), String
 		if strongly {
 			if actual_outcome != expected_outcome {
 				return Err(format!(
-					"failed({}): expected {:?}, got {:?}",
+					"{}:{}: {}\n\
+						\texpected {:?}, got {:?}",
+					title,
+					count,
 					line_str.trim(),
 					actual_outcome,
 					expected_outcome
@@ -69,7 +75,10 @@ fn test_file(title: &str, filename: String, strongly: bool) -> Result<(), String
 		} else {
 			if std::mem::discriminant(&actual_outcome) != std::mem::discriminant(&expected_outcome) {
 				return Err(format!(
-					"failed({}): expected {:?}, got {:?} (weak solver)",
+					"{}:{}: {}\n\
+						\texpected {:?}, got {:?} (weak solver)",
+					title,
+					count,
 					line_str.trim(),
 					actual_outcome,
 					expected_outcome
@@ -84,7 +93,7 @@ fn test_file(title: &str, filename: String, strongly: bool) -> Result<(), String
 
 	let mean_nanos = sum_durations as f64/ count as f64;
 
-	println!("test={} mean_time={} mean_nb_pos={:.1} strongly_solved={} completion={:.2}%",
+	println!("test={} mean_time={} mean_nb_pos={:.1} strongly_solved={} completion={}",
 		title,
 		if mean_nanos > 1e9 {
 			format!("{:.4}s", mean_nanos / 1e9)
@@ -97,7 +106,11 @@ fn test_file(title: &str, filename: String, strongly: bool) -> Result<(), String
 		},
 		sum_positions_checked as f64 / count as f64,
 		strongly,
-		count as f64 / 10.0,
+		count,
 	);
-	Ok(())
+
+	match count {
+		1_000 => Ok(()),
+		_ => Err("Could not finish in time.".to_string())
+	}
 }
