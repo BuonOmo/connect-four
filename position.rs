@@ -2,10 +2,8 @@ pub struct GridSize { pub height: u8, pub width: u8 }
 
 pub const GRID_SIZE: GridSize = GridSize { height: 6, width: 7 };
 
-pub const MIN_SCORE: i8 = -((GRID_SIZE.width*GRID_SIZE.height) as i8)/2 + 3;
-pub const MAX_SCORE: i8 = (GRID_SIZE.width*GRID_SIZE.height+1) as i8/2 - 3;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Position {
 	player_mask: u64,
 	pieces_mask: u64,

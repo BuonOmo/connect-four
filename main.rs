@@ -6,6 +6,7 @@ mod position;
 mod solver;
 
 use crate::position::{Position, GRID_SIZE};
+use crate::solver::Solver;
 
 const GRID_CELL_SIZE_PX: usize = 256;
 
@@ -45,7 +46,8 @@ impl From<(u8, u8)> for GridPosition {
 enum Move {
     Left,
     Right,
-    Drop
+    Drop,
+    IA
 }
 
 impl Move {
@@ -57,6 +59,7 @@ impl Move {
             KeyCode::NumpadEnter => Some(Move::Drop),
             KeyCode::Return => Some(Move::Drop),
             KeyCode::Space => Some(Move::Drop),
+            KeyCode::I => Some(Move::IA),
             _ => None,
         }
     }
@@ -115,25 +118,45 @@ impl Who {
 //     }
 // }
 
+#[derive(Clone, Copy, Debug)]
+enum Outcome { Draw, Win }
+
 struct GameState {
     position: Position,
     cursor: u8,
     who: Who,
     moves: LinkedList<u8>,
+    finished: Option<Outcome>
 }
 
 impl GameState {
     pub fn new(_ctx: &mut Context, start_position: Option<String>) -> GameState {
         println!("Starting position: {:?}", start_position);
+        let position_str = start_position.unwrap_or("".to_string());
+        let (position, moves) = match Position::try_from(position_str.clone()) {
+            Ok(position) =>
+                (
+                    position,
+                    position_str
+                        .chars()
+                        .map(|c|(c.to_digit(10).unwrap() - 1) as u8)
+                        .collect::<LinkedList<u8>>()
+                ),
+            Err(_) => (Position::new_empty(), LinkedList::new())
+        };
         GameState {
-            position: match start_position {
-                Some(str) => Position::try_from(str).unwrap_or(Position::new_empty()),
-                None => Position::new_empty()
-            },
+            position: position,
             cursor: 3,
             who: Who::PlayerRed,
-            moves: LinkedList::new(),
+            moves: moves,
+            finished: None
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.moves.clear();
+        self.position = Position::new_empty();
+        self.finished = None;
     }
 
     fn draw_cell(&mut self, ctx: &mut Context, pos: GridPosition, color: graphics::Color) -> GameResult<()> {
@@ -165,27 +188,41 @@ impl GameState {
         Ok(())
     }
 
-    pub fn try_drop(&mut self) {
-        if !self.position.can_play(self.cursor as u8) { return; }
-        if self.position.wins(self.cursor as u8) {
-            println!("win!");
+    fn ia_move(&self) -> u8 {
+        println!("IA Playing move ({}).", self.moves.iter().fold(String::new(), |a, b| a + &(b+1).to_string()));
+        let (best_mov, _, outcome) = Solver::solve(self.position);
+        println!("outcome: {:?}", outcome);
+        best_mov
+    }
+
+    fn try_drop(&mut self, column: u8) {
+        if let Some(outcome) = self.finished {
+            println!("Game Over ({:?})", outcome);
+            self.reset();
+            return
         }
-        self.moves.push_back(self.cursor);
-        self.position = self.position.next(self.cursor as u8);
-        println!("{}", self.position);
+        if !self.position.can_play(column) { return; }
+        if self.position.wins(column) {
+            self.finished = Some(Outcome::Win);
+        }
+        self.moves.push_back(column);
+        self.position = self.position.next(column);
+        if self.position.is_terminal() {
+            self.finished = Some(Outcome::Draw);
+        }
     }
 }
 
 impl event::EventHandler for GameState {
     fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
-        // Update code here...
-        // TODO: if IA to move, then compute and update the move here
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::Color::from_rgb(57, 105, 239));
         let mut counters: [u8; GRID_SIZE.width as usize] = [0; GRID_SIZE.width as usize];
+
+        // TODO: show the win somehow.
 
         let mut who = self.who;
         for column in self.moves.clone() {
@@ -215,10 +252,10 @@ impl event::EventHandler for GameState {
         match Move::from_keycode(keycode) {
             Some(Move::Left) => self.cursor = (GRID_SIZE.width + self.cursor - 1) % GRID_SIZE.width,
             Some(Move::Right) => self.cursor = (GRID_SIZE.width + self.cursor + 1) % GRID_SIZE.width ,
-            Some(Move::Drop) => self.try_drop(),
+            Some(Move::Drop) => self.try_drop(self.cursor),
+            Some(Move::IA) => self.try_drop(self.ia_move()),
             None => (),
         }
-        //println!("cursor: {}", self.cursor);
     }
 }
 

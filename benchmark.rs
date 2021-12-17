@@ -52,11 +52,11 @@ fn test_file(title: &str, filename: String, strongly: bool) -> Result<(), String
 		let pos_str = split.next().unwrap().to_string();
 		let expected_outcome: Outcome = split.next().unwrap().parse::<i8>().unwrap().into();
 		let now = std::time::Instant::now();
-		let (positions_checked, actual_outcome) =
+		let (_best_mov, positions_checked, actual_outcome) =
 			if strongly {
-				Solver::solve(pos_str).unwrap()
+				Solver::solve_str(pos_str).unwrap()
 			} else {
-				Solver::weakly_solve(pos_str).unwrap()
+				Solver::weakly_solve_str(pos_str).unwrap()
 			};
 		let duration = now.elapsed().as_nanos();
 
