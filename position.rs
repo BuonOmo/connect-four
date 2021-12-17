@@ -2,6 +2,15 @@ pub struct GridSize { pub height: u8, pub width: u8 }
 
 pub const GRID_SIZE: GridSize = GridSize { height: 6, width: 7 };
 
+const fn bottom_row_mask(width: u64, height: u64) -> u64 {
+	match width {
+		0 => 0,
+		_ => bottom_row_mask(width - 1, height) | (1u64 << (width-1)*(height+1))
+	}
+}
+
+const BOTTOM_ROW_MASK: u64 = bottom_row_mask(GRID_SIZE.width as u64, GRID_SIZE.height as u64);
+const BOARD_MASK: u64 = BOTTOM_ROW_MASK * ((1 << GRID_SIZE.height)-1);
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Position {
@@ -81,6 +90,60 @@ impl Position {
 	// return a bitmask 1 on all the cells of a given column
 	fn column_mask(col: u8) -> u64 {
 		return ((1 << GRID_SIZE.height)-1) << col*(GRID_SIZE.height+1);
+	}
+
+	fn winning_position_mask(&self) -> u64 {
+		Position::compute_winning_position(self.player_mask, self.pieces_mask)
+	}
+
+	pub fn move_score(&self, mov: u8) -> u64 {
+		let next_pieces_mask = self.pieces_mask | (self.pieces_mask + Position::bottom_mask(mov));
+		Position::pop_count(
+			Position::compute_winning_position(
+				(self.player_mask ^ self.pieces_mask) ^ next_pieces_mask,
+				next_pieces_mask
+			)
+		)
+	}
+
+	fn compute_winning_position(player_mask: u64, pieces_mask: u64) -> u64 {
+		// vertical;
+		let mut r: u64 = (player_mask << 1) & (player_mask << 2) & (player_mask << 3);
+
+		//horizontal
+		let mut p: u64 = (player_mask << (GRID_SIZE.height+1)) & (player_mask << (2*(GRID_SIZE.height+1)));
+		r |= p & (player_mask << (3*(GRID_SIZE.height+1)));
+		r |= p & (player_mask >> (GRID_SIZE.height+1));
+		p = (player_mask >> (GRID_SIZE.height+1)) & (player_mask >> (2*(GRID_SIZE.height+1)));
+		r |= p & (player_mask << (GRID_SIZE.height+1));
+		r |= p & (player_mask >> (3*(GRID_SIZE.height+1)));
+
+		//diagonal 1
+		p = (player_mask << GRID_SIZE.height) & (player_mask << (2*GRID_SIZE.height));
+		r |= p & (player_mask << (3*GRID_SIZE.height));
+		r |= p & (player_mask >> GRID_SIZE.height);
+		p = (player_mask >> GRID_SIZE.height) & (player_mask >> (2*GRID_SIZE.height));
+		r |= p & (player_mask << GRID_SIZE.height);
+		r |= p & (player_mask >> (3*GRID_SIZE.height));
+
+		//diagonal 2
+		p = (player_mask << (GRID_SIZE.height+2)) & (player_mask << (2*(GRID_SIZE.height+2)));
+		r |= p & (player_mask << (3*(GRID_SIZE.height+2)));
+		r |= p & (player_mask >> (GRID_SIZE.height+2));
+		p = (player_mask >> (GRID_SIZE.height+2)) & (player_mask >> (2*(GRID_SIZE.height+2)));
+		r |= p & (player_mask << (GRID_SIZE.height+2));
+		r |= p & (player_mask >> (3*(GRID_SIZE.height+2)));
+
+		return r & (BOARD_MASK ^ pieces_mask);
+	}
+
+	const fn pop_count(mut mask: u64) -> u64 {
+		let mut c = 0;
+		while mask != 0 {
+			c+=1;
+			mask &= mask - 1;
+		}
+		c
 	}
 }
 

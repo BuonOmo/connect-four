@@ -196,19 +196,20 @@ impl GameState {
     }
 
     fn try_drop(&mut self, column: u8) {
-        if let Some(outcome) = self.finished {
-            println!("Game Over ({:?})", outcome);
+        if let Some(_) = self.finished {
             self.reset();
             return
         }
         if !self.position.can_play(column) { return; }
         if self.position.wins(column) {
             self.finished = Some(Outcome::Win);
+            println!("Game Over, win.");
         }
         self.moves.push_back(column);
         self.position = self.position.next(column);
         if self.position.is_terminal() {
             self.finished = Some(Outcome::Draw);
+            println!("Game Over, draw");
         }
     }
 }
@@ -260,7 +261,6 @@ impl event::EventHandler for GameState {
 }
 
 fn main() {
-    // solver::solve();
     // Make a Context.
     let (mut ctx, event_loop) = ggez::ContextBuilder::new("Connect 4", "Ulysse Buonomo")
         .window_setup(ggez::conf::WindowSetup::default().title("Connect 4!"))

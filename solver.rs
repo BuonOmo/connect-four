@@ -57,7 +57,7 @@ impl Solver {
 		let mut solver = Solver::new();
 		match solver.weakly_solve_(position) {
 			(mov, outcome) => {
-				assert_ne!(mov, u8::MAX, "impossible best move");
+				// assert_ne!(mov, u8::MAX, "impossible best move");
 				(mov, solver.positions_checked, outcome.into())
 			}
 		}
@@ -101,10 +101,14 @@ impl Solver {
 			- pos.move_count as i8
 		) / 2;
 
+		let mut estimate_scores: std::collections::BinaryHeap<MoveScore> = std::collections::BinaryHeap::new();
+
 		for mov in pos.possible_moves() {
 			if pos.wins(mov) {
 				return (mov, position_evaluation)
 			}
+
+			estimate_scores.push(MoveScore(mov, (pos.move_score(mov), [0,1,2,3,2,1,0][mov as usize])))
 		}
 
 		// Initialized to make sure we compile, however, this will
@@ -130,9 +134,7 @@ impl Solver {
 
 		// Moves in the center are more likely to provide an efficient result, this
 		// heuristic should massively improve our alpha-beta pruning.
-		for mov in [3, 4, 2, 5, 1, 6, 0] {
-			if !pos.can_play(mov) { continue }
-
+		while let Some(MoveScore(mov, _)) = estimate_scores.pop() {
 			// Since opponent win condition is the opposite of ours, their
 			// window is [-beta;-alpha].
 			let score = match self.negamax(pos.next(mov), -beta, -alpha) {
@@ -143,7 +145,8 @@ impl Solver {
 			if score >= beta { return (mov, score) }
 
 			// Reduce the alpha-beta window is possible.
-			if score >= alpha {
+			// TODO: use a move queue there and pick one at random.
+			if score > alpha {
 				alpha = score;
 				best_mov = mov;
 			}
@@ -173,6 +176,7 @@ fn test_solve() {
 	);
 	assert!(matches!(Solver::solve_str("23163416124767223154467471272416755633".to_string()), Ok((.., Outcome::Draw))));
 }
+
 #[test]
 fn test_from_beginning() {
 	assert!(matches!(Solver::weakly_solve_str("".to_string()), Ok((3, _, Outcome::Win(_)))));
