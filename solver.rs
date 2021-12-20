@@ -43,6 +43,16 @@ impl std::cmp::Ord for MoveScore {
 }
 
 impl Solver {
+	pub fn explain_outcome(position: Position, outcome: Outcome) -> String {
+		let end_in_x_moves = |x: u8|
+			(Position::max_moves() as i8 - position.move_count as i8) / 2 - x as i8 + 1;
+		match outcome {
+			Outcome::Draw => "draw".to_string(),
+			Outcome::Win(x) => format!("win in {} moves", end_in_x_moves(x)),
+			Outcome::Loose(x) => format!("loose in {} moves", end_in_x_moves(x))
+		}
+	}
+
 	pub fn solve(position: Position) -> SolverResult {
 		let mut solver = Solver::new();
 		match solver.strongly_solve(position) {
@@ -80,14 +90,14 @@ impl Solver {
 	fn new() -> Solver { Solver { positions_checked: 0, transposition_table: HashMap::new() } }
 
 	fn weakly_solve_(&mut self, position: Position) -> (u8, i8) {
-		self.negamax(position, -1,  1)
+		self.negamax(position, -1,  1, 14 + 2 * position.move_count as i8)
 	}
 
 	fn strongly_solve(&mut self, position: Position) -> (u8, i8) {
-		self.negamax(position, i8::MIN + 1, i8::MAX - 1)
+		self.negamax(position, i8::MIN + 1, i8::MAX - 1, 14 + 2 * position.move_count as i8)
 	}
 
-	fn negamax(&mut self, pos: Position, mut alpha: i8, mut beta: i8) -> (u8, i8) {
+	fn negamax(&mut self, pos: Position, mut alpha: i8, mut beta: i8, depth: i8) -> (u8, i8) {
 		self.positions_checked += 1;
 		// Check for draw, this is ok to do it here, but if given an
 		// already winning position with a full grid, negamax would
@@ -132,12 +142,20 @@ impl Solver {
 			if alpha >= beta { return (best_mov, beta) } // we can prune early, the window is empty.
 		}
 
+		// A realy dirty way to go faster in early game. We return a position
+		// estimation that is just: _I think this is a draw_.
+		if depth == 0 {
+			if let Some(MoveScore(mov, _)) = estimate_scores.peek() {
+				return (*mov, 0); // just assume it is a draw.
+			}
+		}
+
 		// Moves in the center are more likely to provide an efficient result, this
 		// heuristic should massively improve our alpha-beta pruning.
 		while let Some(MoveScore(mov, _)) = estimate_scores.pop() {
 			// Since opponent win condition is the opposite of ours, their
 			// window is [-beta;-alpha].
-			let score = match self.negamax(pos.next(mov), -beta, -alpha) {
+			let score = match self.negamax(pos.next(mov), -beta, -alpha, depth - 1) {
 				(_, sc) => -sc
 			};
 

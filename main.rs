@@ -191,7 +191,7 @@ impl GameState {
     fn ia_move(&self) -> u8 {
         println!("IA Playing move ({}).", self.moves.iter().fold(String::new(), |a, b| a + &(b+1).to_string()));
         let (best_mov, _, outcome) = Solver::solve(self.position);
-        println!("outcome: {:?}", outcome);
+        println!("outcome: {}", Solver::explain_outcome(self.position, outcome));
         best_mov
     }
 

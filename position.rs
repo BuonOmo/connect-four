@@ -20,6 +20,9 @@ pub struct Position {
 }
 
 impl Position {
+	pub fn max_moves() -> u8 {
+		GRID_SIZE.height * GRID_SIZE.width
+	}
 	pub fn new_empty() -> Position {
 		Position { player_mask: 0, pieces_mask: 0, move_count: 0 }
 	}
